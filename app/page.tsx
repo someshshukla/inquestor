@@ -2,9 +2,35 @@
 import React, { useState, useEffect } from 'react';
 import { Bot, Link as LinkIcon, Loader2, AlertTriangle, FileDown, KeyRound, ChevronRight } from 'lucide-react';
 
+// Define interfaces for our data structures to satisfy TypeScript
 interface TypewriterProps {
   text: string;
   speed?: number;
+}
+
+interface Source {
+  title: string;
+  uri: string;
+}
+
+interface ResearchResult {
+  topic: string;
+  summary: string;
+  sources: Source[];
+}
+
+// Define a minimal type definition for the jsPDF object loaded from the CDN
+interface CustomJsPDF {
+  text(text: string | string[], x: number, y: number, options?: any): this;
+  splitTextToSize(text: string, width: number): string[];
+  internal: { pageSize: { getWidth: () => number; getHeight: () => number } };
+  setTextColor(r: number, g: number, b: number): this;
+  setFontSize(size: number): this;
+  setFont(fontName: string, fontStyle: string): this;
+  getTextDimensions(text: string, options?: any): { h: number };
+  addPage(): this;
+  save(filename: string): this;
+  textWithLink(text: string, x: number, y: number, options: { url: string }): this;
 }
 
 function Typewriter({ text, speed = 20 }: TypewriterProps) {
@@ -30,7 +56,7 @@ function Typewriter({ text, speed = 20 }: TypewriterProps) {
   return (
     <p className="text-gray-300 text-lg leading-relaxed whitespace-pre-wrap">
       {displayedText}
-      {displayedText.length < text?.length && <span className="inline-block w-2.5 h-6 bg-cyan-400 animate-pulse ml-1 translate-y-1" aria-hidden="true"></span>}
+      {displayedText.length < (text?.length || 0) && <span className="inline-block w-2.5 h-6 bg-cyan-400 animate-pulse ml-1 translate-y-1" aria-hidden="true"></span>}
     </p>
   );
 }
@@ -38,7 +64,7 @@ function Typewriter({ text, speed = 20 }: TypewriterProps) {
 export default function App() {
   const [query, setQuery] = useState('');
   const [apiKey, setApiKey] = useState('');
-  const [result, setResult] = useState<{topic: string, summary: string, sources: {title: string, uri: string}[]} | null>(null);
+  const [result, setResult] = useState<ResearchResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -109,20 +135,28 @@ export default function App() {
         try {
             const jsonString = rawText.replace(/```json\n?/, "").replace(/```$/, "");
             parsedContent = JSON.parse(jsonString);
-        } catch (e) {
+        } catch (parseError) {
+            console.error("Parse Error:", parseError);
             throw new Error("The model returned a weird format. Try again.");
         }
 
         const groundingMetadata = candidate.groundingMetadata;
-        const sources = groundingMetadata?.groundingAttributions?.map((attr: any) => ({
-            title: attr.web?.title,
-            uri: attr.web?.uri,
-        })).filter((source: any) => source.uri && source.title) || [];
+        type Attribution = { web?: { title?: string; uri?: string } };
+        const sources: Source[] = groundingMetadata?.groundingAttributions
+            ?.map((attr: Attribution) => ({
+                title: attr.web?.title || '',
+                uri: attr.web?.uri || '',
+            }))
+            .filter((source: Source) => source.uri && source.title) || [];
 
         setResult({ ...parsedContent, sources });
 
-    } catch (err: any) {
-        setError(err.message || "An unknown error happened.");
+    } catch (err: unknown) {
+        if (err instanceof Error) {
+          setError(err.message || "An unknown error happened.");
+        } else {
+          setError("An unknown error happened.");
+        }
     } finally {
         setLoading(false);
     }
@@ -130,13 +164,14 @@ export default function App() {
 
   function downloadPdf() {
     try {
-        if (!result || typeof (window as any).jspdf === 'undefined') {
+        const jspdfModule = (window as any).jspdf;
+        if (!result || typeof jspdfModule === 'undefined') {
             setError("Can't download PDF yet.");
             return;
         }
 
-        const { jsPDF } = (window as any).jspdf;
-        const pdf = new jsPDF('p', 'mm', 'a4');
+        const { jsPDF } = jspdfModule;
+        const pdf: CustomJsPDF = new jsPDF('p', 'mm', 'a4');
 
         const pageWidth = pdf.internal.pageSize.getWidth();
         const margin = 20;
@@ -171,14 +206,18 @@ export default function App() {
                 yPosition += pdf.getTextDimensions(source.title, { maxWidth: pageWidth - margin * 2 }).h + 2;
                 
                 pdf.setTextColor(0, 0, 255);
-                (pdf as any).textWithLink(source.uri, margin, yPosition, { url: source.uri });
+                pdf.textWithLink(source.uri, margin, yPosition, { url: source.uri });
                 yPosition += 10;
             });
         }
         
         pdf.save(`${result.topic.replace(/\s/g, '_')}.pdf`);
-    } catch (e) {
-        setError("Something went wrong making the PDF.");
+    } catch (err: unknown) {
+        if (err instanceof Error) {
+            setError(`Something went wrong making the PDF: ${err.message}`);
+        } else {
+            setError("Something went wrong making the PDF.");
+        }
     }
   }
 
