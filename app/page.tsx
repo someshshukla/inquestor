@@ -19,19 +19,39 @@ interface ResearchResult {
   sources: Source[];
 }
 
+// Define specific types for jsPDF options to avoid using 'any'
+interface JsPDFTextOptions {
+  align?: 'left' | 'center' | 'right' | 'justify';
+  maxWidth?: number;
+}
+
+interface JsPDFGetTextDimensionsOptions {
+  maxWidth?: number;
+}
+
 // Define a minimal type definition for the jsPDF object loaded from the CDN
 interface CustomJsPDF {
-  text(text: string | string[], x: number, y: number, options?: any): this;
+  text(text: string | string[], x: number, y: number, options?: JsPDFTextOptions): this;
   splitTextToSize(text: string, width: number): string[];
   internal: { pageSize: { getWidth: () => number; getHeight: () => number } };
   setTextColor(r: number, g: number, b: number): this;
   setFontSize(size: number): this;
   setFont(fontName: string, fontStyle: string): this;
-  getTextDimensions(text: string, options?: any): { h: number };
+  getTextDimensions(text: string, options?: JsPDFGetTextDimensionsOptions): { h: number };
   addPage(): this;
   save(filename: string): this;
   textWithLink(text: string, x: number, y: number, options: { url: string }): this;
 }
+
+// Extend the global Window interface to include the jspdf library
+declare global {
+    interface Window {
+        jspdf?: {
+            jsPDF: new (orientation?: 'p' | 'l', unit?: 'mm' | 'in' | 'pt', format?: 'a4' | string) => CustomJsPDF;
+        };
+    }
+}
+
 
 function Typewriter({ text, speed = 20 }: TypewriterProps) {
   const [displayedText, setDisplayedText] = useState('');
@@ -164,9 +184,9 @@ export default function App() {
 
   function downloadPdf() {
     try {
-        const jspdfModule = (window as any).jspdf;
+        const jspdfModule = window.jspdf;
         if (!result || typeof jspdfModule === 'undefined') {
-            setError("Can't download PDF yet.");
+            setError("Can't download PDF yet. The PDF library might still be loading.");
             return;
         }
 
