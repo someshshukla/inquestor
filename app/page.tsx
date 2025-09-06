@@ -89,6 +89,8 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    document.title = "Inquestor AI";
+    
     const jspdfScript = document.createElement('script');
     jspdfScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
     jspdfScript.async = true;
@@ -252,7 +254,7 @@ export default function App() {
             </h1>
           </div>
           <p className="text-gray-400 mt-3 text-lg">
-            Your intelligent research assistant. Powered by Gemini.
+            Your intelligent research assistant. Get sourced answers and downloadable PDF reports.
           </p>
         </header>
         
