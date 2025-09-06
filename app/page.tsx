@@ -1,8 +1,13 @@
 "use client";
-import React, { useState, useCallback, useEffect } from 'react';
-import { Search, Bot, Link as LinkIcon, Loader2, AlertTriangle, FileDown, KeyRound, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Bot, Link as LinkIcon, Loader2, AlertTriangle, FileDown, KeyRound, ChevronRight } from 'lucide-react';
 
-function Typewriter({ text, speed = 20 }) {
+interface TypewriterProps {
+  text: string;
+  speed?: number;
+}
+
+function Typewriter({ text, speed = 20 }: TypewriterProps) {
   const [displayedText, setDisplayedText] = useState('');
 
   useEffect(() => {
@@ -33,9 +38,9 @@ function Typewriter({ text, speed = 20 }) {
 export default function App() {
   const [query, setQuery] = useState('');
   const [apiKey, setApiKey] = useState('');
-  const [result, setResult] = useState(null);
+  const [result, setResult] = useState<{topic: string, summary: string, sources: {title: string, uri: string}[]} | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const jspdfScript = document.createElement('script');
@@ -109,14 +114,14 @@ export default function App() {
         }
 
         const groundingMetadata = candidate.groundingMetadata;
-        const sources = groundingMetadata?.groundingAttributions?.map(attr => ({
+        const sources = groundingMetadata?.groundingAttributions?.map((attr: any) => ({
             title: attr.web?.title,
             uri: attr.web?.uri,
-        })).filter(source => source.uri && source.title) || [];
+        })).filter((source: any) => source.uri && source.title) || [];
 
         setResult({ ...parsedContent, sources });
 
-    } catch (err) {
+    } catch (err: any) {
         setError(err.message || "An unknown error happened.");
     } finally {
         setLoading(false);
@@ -125,12 +130,12 @@ export default function App() {
 
   function downloadPdf() {
     try {
-        if (!result || typeof window.jspdf === 'undefined') {
+        if (!result || typeof (window as any).jspdf === 'undefined') {
             setError("Can't download PDF yet.");
             return;
         }
 
-        const { jsPDF } = window.jspdf;
+        const { jsPDF } = (window as any).jspdf;
         const pdf = new jsPDF('p', 'mm', 'a4');
 
         const pageWidth = pdf.internal.pageSize.getWidth();
@@ -166,7 +171,7 @@ export default function App() {
                 yPosition += pdf.getTextDimensions(source.title, { maxWidth: pageWidth - margin * 2 }).h + 2;
                 
                 pdf.setTextColor(0, 0, 255);
-                pdf.textWithLink(source.uri, margin, yPosition, { url: source.uri });
+                (pdf as any).textWithLink(source.uri, margin, yPosition, { url: source.uri });
                 yPosition += 10;
             });
         }
